@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Моя Экспресс Панель</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background-color: #33373b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #fff; height: 100vh; display: flex; flex-direction: column; overflow: hidden; background-size: cover; background-position: center; background-repeat: no-repeat; }
+
+        .header { display: flex; justify-content: center; align-items: center; padding: 20px 20px 10px; position: relative; width: 100%; max-width: 1100px; margin: 0 auto; flex-shrink: 0; z-index: 10; }
+        .search-container { display: flex; width: 100%; max-width: 850px; align-items: center; gap: 15px; }
+
+        .search-bar { display: flex; flex: 1; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.35); height: 46px; align-items: center; }
+        
+        .select-wrapper { position: relative; display: flex; align-items: center; background: #f4f4f4; height: 100%; border-right: 1px solid #e0e0e0; }
+        .search-bar select { border: none; padding: 0 38px 0 16px; background: transparent; font-weight: 500; font-size: 14px; outline: none; cursor: pointer; color: #333; appearance: none; height: 100%; }
+        .select-arrow { position: absolute; right: 14px; pointer-events: none; font-size: 12px; color: #666; }
+
+        .search-bar input { flex: 1; border: none; padding: 0 16px; font-size: 15px; outline: none; color: #222; background: transparent; height: 100%; }
+        
+        .mic-btn { background: none; border: none; cursor: pointer; font-size: 18px; padding: 0 8px; color: #606060; display: flex; align-items: center; justify-content: center; transition: color 0.15s; height: 100%; }
+        .mic-btn svg { width: 21px; height: 26px; display: block; flex-shrink: 0; }
+        .mic-btn:hover { color: #222; }
+        .mic-btn.listening { color: #fc3f1d; animation: pulse-mic 1s infinite; }
+        @keyframes pulse-mic { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+
+        .search-bar button.find-btn { background: #222; color: #fff; border: none; padding: 0 30px; font-size: 15px; cursor: pointer; font-weight: 500; transition: background 0.15s; height: 100%; }
+        .search-bar button.find-btn:hover { background: #333; }
+
+        .settings-btn-inline { height: 46px; width: 46px; background: rgba(255, 255, 255, 0.9); border: none; border-radius: 8px; cursor: pointer; font-size: 22px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 20px rgba(0,0,0,0.35); transition: all 0.15s ease-in-out; color: #222; flex-shrink: 0; }
+        .settings-btn-inline svg { width: 34px; height: 34px; display: block; flex-shrink: 0; }
+        .settings-btn-inline:hover { background: #ffffff; transform: scale(1.05); color: #fc3f1d; }
+
+        .main-content { flex: 1; display: flex; align-items: flex-start; padding: 15px 60px 10px; overflow: hidden; position: relative; width: 100%; }
+        
+        .workspaces-slider { display: flex; width: 100%; height: 100%; align-items: flex-start; transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1); will-change: transform; }
+        .workspace-page { min-width: 100%; width: 100%; height: 100%; display: flex; justify-content: center; align-items: flex-start; flex-shrink: 0; padding: 5px 0; overflow: hidden; }
+
+        .tiles-grid { display: grid; gap: 12px; justify-content: center; align-content: start; margin: 0 auto; max-width: 100%; max-height: 100%; }
+
+        .tile { background: #222; border-radius: 12px; display: flex; align-items: center; justify-content: center; text-decoration: none; position: relative; box-shadow: 0 4px 12px rgba(0,0,0,0.4); transition: transform 0.15s, box-shadow 0.15s; overflow: hidden; cursor: pointer; padding: 0; user-select: none; }
+        .tile:hover { transform: translateY(-3px); box-shadow: 0 6px 18px rgba(0,0,0,0.6); }
+        .tile img.tile-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
+        .tile.dragging { opacity: 0.3; border: 2px dashed #fc3f1d; }
+
+        .tile-actions { position: absolute; top: 6px; right: 5px; display: none; gap: 1px; z-index: 3; }
+        .tile:hover .tile-actions { display: flex; }
+        .tile-action-btn { background: none; color: #80947e; border: none; cursor: pointer; font-size: 16px; font-weight: normal; display: flex; align-items: center; justify-content: center; transition: 0.1s; width: 14px; height: 14px; padding: 0; }
+        .tile-action-btn svg { width: 13px; height: 13px; display: block; }
+        .tile-action-btn:hover { transform: scale(1.15); color: #ffeb3b; }
+
+        .empty-slot { background: transparent; border: 2px dashed transparent; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease; position: relative; }
+        .empty-slot:hover { background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.25); transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.3); }
+        .empty-slot .plus-icon { font-size: 24px; color: transparent; transition: color 0.2s; }
+        .empty-slot:hover .plus-icon { color: rgba(255,255,255,0.75); }
+        .empty-slot.drag-over { background: rgba(252, 63, 29, 0.15); border-color: #fc3f1d; }
+
+        .nav-arrow { position: absolute; top: 50%; transform: translateY(-50%); width: 45px; height: 75px; background: rgba(0, 0, 0, 0.45); color: #fff; border: none; font-size: 26px; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 100; opacity: 0; transition: opacity 0.2s ease, background 0.15s; }
+        .main-content:hover .nav-arrow { opacity: 0.7; }
+        .nav-arrow:hover { opacity: 1 !important; background: rgba(0, 0, 0, 0.8); }
+        .nav-arrow.left { left: 15px; border-radius: 0 8px 8px 0; }
+        .nav-arrow.right { right: 15px; border-radius: 8px 0 0 8px; }
+
+        .tabs-bar { position: fixed; bottom: 0; left: 0; width: 100%; background: transparent; display: flex; justify-content: center; align-items: flex-end; gap: 2px; padding: 0 10px; z-index: 200; height: 36px; }
+        .tab-item { background: rgba(30, 32, 35, 0.85); border: 1px solid rgba(255,255,255,0.08); border-bottom: none; color: #aaa; padding: 6px 24px; font-size: 13px; font-weight: 500; cursor: pointer; border-radius: 6px 6px 0 0; text-transform: uppercase; letter-spacing: 0.5px; transition: 0.15s; user-select: none; backdrop-filter: blur(6px); }
+        .tab-item:hover { background: rgba(50, 54, 60, 0.95); color: #fff; }
+        .tab-item.active { background: rgba(61, 66, 71, 0.95); color: #fff; border-color: rgba(255,255,255,0.2); font-weight: 600; box-shadow: 0 -2px 8px rgba(0,0,0,0.3); }
+        .tab-item.drag-over-tab { background: #fc3f1d !important; color: #fff !important; border-color: #ff735c; box-shadow: 0 0 12px rgba(252,63,29,0.8); }
+
+        .add-tab-item { background: rgba(255,255,255,0.1); border: 1px dashed rgba(255,255,255,0.3); color: #ddd; border-radius: 6px 6px 0 0; padding: 6px 16px; }
+        .add-tab-item:hover { background: rgba(255,255,255,0.2); color: #fff; }
+
+        .context-menu { position: fixed; background: #fff; color: #222; border-radius: 6px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); width: 220px; display: none; z-index: 2000; overflow: hidden; padding: 6px 0; font-size: 14px; }
+        .context-menu-title { padding: 8px 16px; font-weight: 600; color: #111; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 8px; font-size: 13px; }
+        .context-menu-item { padding: 10px 16px; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: 0.1s; color: #333; }
+        .context-menu-item:hover { background: #f0f0f0; color: #000; }
+        .context-menu-item.danger { color: #d9534f; }
+        .context-menu-item.danger:hover { background: #fdf2f2; }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.65); display: none; justify-content: center; align-items: center; z-index: 3000; }
+        .modal-window { background: #fff; color: #222; width: 850px; height: 560px; border-radius: 10px; display: flex; overflow: hidden; box-shadow: 0 12px 35px rgba(0,0,0,0.6); }
+
+        .modal-sidebar { width: 250px; background: #f7f7f7; border-right: 1px solid #ddd; padding: 25px 0; display: flex; flex-direction: column; }
+        .modal-sidebar h3 { padding: 0 25px 20px; font-size: 22px; color: #111; font-weight: 600; }
+        .modal-menu-item { padding: 12px 25px; cursor: pointer; font-size: 15px; color: #333; border-left: 4px solid transparent; transition: 0.1s; }
+        .modal-menu-item:hover { background: #ececec; }
+        .modal-menu-item.active { background: #e2e2e2; border-left-color: #fc3f1d; font-weight: 600; color: #000; }
+
+        .modal-body { flex: 1; padding: 35px; overflow-y: auto; display: flex; flex-direction: column; justify-content: space-between; }
+        .modal-body h4 { font-size: 18px; margin-bottom: 22px; border-bottom: 1px solid #eee; padding-bottom: 10px; color: #111; }
+
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; font-size: 14px; color: #444; margin-bottom: 8px; font-weight: 500; }
+        .form-group input[type="text"], .form-group input[type="number"], .form-group select { width: 100%; padding: 10px 14px; border: 1px solid #ccc; border-radius: 5px; font-size: 15px; outline: none; }
+        .form-group input:focus { border-color: #fc3f1d; }
+
+        .modal-footer { display: flex; justify-content: flex-end; gap: 12px; margin-top: 25px; }
+        .btn-primary { background: #fc3f1d; color: white; border: none; padding: 10px 24px; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: 500; }
+        .btn-primary:hover { background: #e03517; }
+        .btn-secondary { background: #e0e0e0; color: #333; border-radius: 5px; border: none; padding: 10px 24px; cursor: pointer; font-size: 14px; }
+        .btn-secondary:hover { background: #d0d0d0; }
+
+        .crop-container { display: flex; gap: 20px; align-items: flex-start; }
+        .crop-preview-wrap { width: 360px; height: 220px; background: #ccc; position: relative; overflow: hidden; border: 1px solid #bbb; border-radius: 4px; cursor: grab; }
+        .crop-preview-wrap:active { cursor: grabbing; }
+        #cropImage { position: absolute; top: 0; left: 0; user-select: none; pointer-events: none; }
+    </style>
+</head>
+<body>
+    <!-- Один и тот же контур шестерёнки для закладок и главной кнопки. -->
+    <svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" aria-hidden="true" style="position:absolute;overflow:hidden">
+        <symbol id="gear-icon" viewBox="0 0 24 24">
+            <path d="M9.40 4.01 L9.78 1.53 L14.22 1.53 L14.60 4.01 L15.81 4.52 L17.83 3.03 L20.97 6.17 L19.48 8.19 L19.99 9.40 L22.47 9.78 L22.47 14.22 L19.99 14.60 L19.48 15.81 L20.97 17.83 L17.83 20.97 L15.81 19.48 L14.60 19.99 L14.22 22.47 L9.78 22.47 L9.40 19.99 L8.19 19.48 L6.17 20.97 L3.03 17.83 L4.52 15.81 L4.01 14.60 L1.53 14.22 L1.53 9.78 L4.01 9.40 L4.52 8.19 L3.03 6.17 L6.17 3.03 L8.19 4.52 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            <circle cx="12" cy="12" r="3.35" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        </symbol>
+        <symbol id="close-icon" viewBox="0 0 24 24">
+            <path d="M6 6 18 18 M18 6 6 18" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round"/>
+            <path d="M6 6 18 18 M18 6 6 18" fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round"/>
+        </symbol>
+    </svg>
+    <div class="header">
+        <div class="search-container">
+            <div class="search-bar">
+                <div class="select-wrapper">
+                    <select id="searchEngine">
+                        <option value="https://yandex.ru/search/?text=">Яндекс</option>
+                        <option value="https://www.google.com/search?q=">Google</option>
+                        <option value="https://duckduckgo.com/?q=">DuckDuckGo</option>
+                    </select>
+                    <span class="select-arrow">▼</span>
+                </div>
+                <input type="text" id="searchInput" placeholder="Поиск в интернете..." autofocus>
+                <button type="button" class="mic-btn" id="micBtn" onclick="toggleVoiceSearch()" title="Голосовой поиск" aria-label="Голосовой поиск"><svg viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="7" y="1" width="10" height="19" rx="5" fill="currentColor"/><path d="M3 16v1a9 9 0 0 0 18 0v-1 M12 26v4 M6.5 30h11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"/></svg></button>
+                <button class="find-btn" onclick="doSearch()">Найти</button>
+            </div>
+            <button class="settings-btn-inline" onclick="openSettingsModal()" title="Настройки" aria-label="Настройки"><svg aria-hidden="true"><use href="#gear-icon"></use></svg></button>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <button class="nav-arrow left" id="leftArrow" onclick="slideWorkspace(-1)">‹</button>
+        <div id="workspacesSlider" class="workspaces-slider"></div>
+        <button class="nav-arrow right" id="rightArrow" onclick="slideWorkspace(1)">›</button>
+    </div>
+
+    <div id="tabsBar" class="tabs-bar"></div>
+
+    <div id="tabContextMenu" class="context-menu">
+        <div id="ctxMenuTitle" class="context-menu-title">
+            <span>🔖</span> <span id="ctxTabNameText" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Имя стола</span>
+        </div>
+        <div class="context-menu-item" onclick="ctxRenameTab()">
+            <span>✏️</span> Редактировать
+        </div>
+        <div class="context-menu-item danger" onclick="ctxDeleteTab()">
+            <span>🗑️</span> Удалить
+        </div>
+    </div>
+
+    <div id="settingsModal" class="modal-overlay">
+        <div class="modal-window">
+            <div class="modal-sidebar">
+                <h3>Настройки</h3>
+                <div id="menuGeneral" class="modal-menu-item active" onclick="switchSettingsTab('general')">Общие настройки</div>
+                <div id="menuColor" class="modal-menu-item" onclick="switchSettingsTab('color')">Базовое оформление</div>
+                <div id="menuBg" class="modal-menu-item" onclick="switchSettingsTab('bg')">Индивидуальный фон</div>
+                <div id="menuSync" class="modal-menu-item" onclick="switchSettingsTab('sync')">Синхронизация и бэкап</div>
+                <div class="modal-menu-item" onclick="closeSettingsModal()" style="margin-top: auto; border-top: 1px solid #ddd; color: #666;">Вернуться</div>
+            </div>
+            <div class="modal-body">
+                <div id="secGeneral">
+                    <h4>Выберите количество закладок и размеры</h4>
+                    <div class="form-group">
+                        <label>Колонок по горизонтали</label>
+                        <input type="number" id="colsInputModal" min="2" max="16">
+                    </div>
+                    <div class="form-group">
+                        <label>Плиток по вертикали (рядов)</label>
+                        <input type="number" id="rowsInputModal" min="1" max="8">
+                    </div>
+                    <div class="form-group">
+                        <label>Максимальная ширина плитки (px)</label>
+                        <input type="number" id="sizeInputModal" min="80" max="300" step="10">
+                    </div>
+                    <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-top: 15px;">
+                        <input type="checkbox" id="openInNewTabModal" style="width: 18px; height: 18px; cursor: pointer;">
+                        <label for="openInNewTabModal" style="margin: 0; cursor: pointer;">Открывать сайты в новой вкладке</label>
+                    </div>
+                </div>
+
+                <div id="secColor" style="display:none;">
+                    <h4>Настройте цвет фона</h4>
+                    <div class="form-group">
+                        <label>Выберите цвет заднего фона:</label>
+                        <input type="color" id="bgColorInput" style="height:45px; cursor:pointer;" onchange="setBgColor(this.value)">
+                    </div>
+                </div>
+
+                <div id="secBg" style="display:none;">
+                    <h4>Загрузите картинку для фона</h4>
+                    <div class="form-group">
+                        <label style="cursor:pointer; background:#f0f0f0; padding:12px; text-align:center; border-radius:5px; border:1px solid #ccc; display:block;">
+                            📂 Выбрать картинку с компьютера
+                            <input type="file" accept="image/*" onchange="handleBgUpload(event)" style="display:none;">
+                        </label>
+                    </div>
+                </div>
+
+                <div id="secSync" style="display:none;">
+                    <h4>Экспорт и импорт закладок</h4>
+                    <div style="display:flex; gap:15px;">
+                        <button class="btn-primary" onclick="exportData()">💾 Скачать бэкап (.json)</button>
+                        <label class="btn-secondary" style="cursor:pointer; display:inline-block;">
+                            📂 Загрузить бэкап
+                            <input type="file" onchange="importData(event)" style="display:none;">
+                        </label>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn-primary" onclick="saveGlobalSettings()">Сохранить и закрыть</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="addTileModal" class="modal-overlay">
+        <div class="modal-window" style="width: 550px; height: 380px;">
+            <div class="modal-body" style="padding: 30px; justify-content: flex-start;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 20px;">
+                    <h4 style="margin: 0; border: none; padding: 0;">Добавление Сайта</h4>
+                    <button onclick="closeAddTileModal()" style="background: none; border: none; font-size: 18px; cursor: pointer; font-weight: bold;">✕</button>
+                </div>
+                <div class="form-group">
+                    <label>Адрес сайта</label>
+                    <input type="text" id="newTileUrl" placeholder="https://">
+                </div>
+                <div class="form-group">
+                    <label>Название сайта (не обязательно)</label>
+                    <input type="text" id="newTileTitle" placeholder="Введите название">
+                </div>
+                <div class="modal-footer" style="margin-top: auto;">
+                    <button class="btn-primary" onclick="confirmAddTile()" style="width: 100%;">Добавить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tileModal" class="modal-overlay">
+        <div class="modal-window">
+            <div class="modal-sidebar">
+                <h3>Редактирование</h3>
+                <div id="menuBasic" class="modal-menu-item active" onclick="switchTabModal('basic')">Основные данные</div>
+                <div id="menuThumb" class="modal-menu-item" onclick="switchTabModal('thumb')">Настройки миниатюры</div>
+                <div id="menuDelete" class="modal-menu-item" onclick="switchTabModal('delete')" style="color: #d9534f;">Удаление закладки</div>
+                <div class="modal-menu-item" onclick="closeTileModal()" style="margin-top: auto; border-top: 1px solid #ddd; color: #666;">Вернуться</div>
+            </div>
+            <div class="modal-body">
+                <div id="sectionBasic">
+                    <h4>Базовое изменение закладки</h4>
+                    <div class="form-group">
+                        <label>Адрес сайта (URL)</label>
+                        <input type="text" id="tileUrlInput">
+                    </div>
+                    <div class="form-group">
+                        <label>Название сайта</label>
+                        <input type="text" id="tileTitleInput">
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn-primary" onclick="saveTileChanges()">Сохранить</button>
+                    </div>
+                </div>
+
+                <div id="sectionThumb" style="display: none;">
+                    <h4>Установка персональной миниатюры</h4>
+                    <div class="crop-container">
+                        <div class="crop-preview-wrap" id="cropWrap">
+                            <img id="cropImage" src="" alt="Миниатюра">
+                        </div>
+                        <div style="flex: 1;">
+                            <p style="font-size:13px; color:#555; margin-bottom:10px;">Перетаскивайте картинку мышкой, чтобы выбрать нужную область.</p>
+                            <div class="form-group">
+                                <label>Масштаб:</label>
+                                <input type="range" id="scaleRange" min="0.5" max="3" step="0.05" value="1" style="width:100%; cursor:pointer;">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top: 15px;">
+                        <label style="cursor:pointer; background:#f0f0f0; padding:10px; text-align:center; border-radius:5px; border:1px solid #ccc; display:block;">
+                            📂 Загрузить картинку с компьютера
+                            <input type="file" id="uploadThumbFile" accept="image/*" onchange="handleFileUpload(event)" style="display:none;">
+                        </label>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn-primary" onclick="saveTileChanges()">Сохранить</button>
+                    </div>
+                </div>
+
+                <div id="sectionDelete" style="display: none;">
+                    <h4>Подтвердите Удаление закладки</h4>
+                    <p style="font-size:14px; color:#555; margin-bottom:20px;">Вы действительно хотите удалить эту закладку?</p>
+                    <div class="modal-footer" style="justify-content: flex-start;">
+                        <button class="btn-primary" style="background:#d9534f;" onclick="deleteCurrentTile()">Удалить</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const defaultData = {
+            settings: { cols: 8, rows: 4, tileSize: 130, engine: 'https://yandex.ru/search/?text=', bg: '#33373b', openInNewTab: false },
+            tabs: [
+                { id: 'main', name: 'Главная' },
+                { id: 'tickets', name: 'Билеты' },
+                { id: 'office', name: 'Офис' },
+                { id: 'shops', name: 'Магазины' },
+                { id: 'dev', name: 'Разработка' }
+            ],
+            tiles: {
+                'main': {
+                    0: { title: 'eGov', url: 'https://egov.kz', img: 'https://www.google.com/s2/favicons?sz=128&domain=egov.kz' },
+                    1: { title: 'Gemini', url: 'https://gemini.google.com', img: 'https://www.google.com/s2/favicons?sz=128&domain=gemini.google.com' },
+                    2: { title: 'ChatGPT', url: 'https://chatgpt.com', img: 'https://www.google.com/s2/favicons?sz=128&domain=chatgpt.com' },
+                    3: { title: 'DeepSeek', url: 'https://deepseek.com', img: 'https://www.google.com/s2/favicons?sz=128&domain=deepseek.com' },
+                    4: { title: 'TradingView', url: 'https://tradingview.com', img: 'https://www.google.com/s2/favicons?sz=128&domain=tradingview.com' },
+                    5: { title: 'birge.astana.kz', url: 'https://birge.astana.kz', img: 'https://www.google.com/s2/favicons?sz=128&domain=birge.astana.kz' }
+                }
+            }
+        };
+
+        let data = JSON.parse(localStorage.getItem('my_startpage_data')) || defaultData;
+        if (!data.settings) data.settings = defaultData.settings;
+        if (data.settings.rows === undefined) data.settings.rows = 4;
+        if (data.settings.openInNewTab === undefined) data.settings.openInNewTab = false;
+        if (!data.tabs) data.tabs = defaultData.tabs;
+        if (!data.tiles) data.tiles = defaultData.tiles;
+
+        Object.keys(data.tiles).forEach(tabId => {
+            if (Array.isArray(data.tiles[tabId])) {
+                const mapObj = {};
+                data.tiles[tabId].forEach((t, i) => { mapObj[i] = t; });
+                data.tiles[tabId] = mapObj;
+            }
+        });
+
+        let currentTabId = data.tabs[0].id;
+        let editingTileIndex = null;
+        let targetSlotIndex = null;
+        let draggedFromIndex = null;
+        let draggedFromTabId = null;
+        let activeCtxTabId = null;
+        let cropState = { imgObj: new Image(), x: 0, y: 0, scale: 1, isDragging: false, startX: 0, startY: 0 };
+
+        function saveData() { localStorage.setItem('my_startpage_data', JSON.stringify(data)); render(); }
+
+        function calculateAdaptiveTileSize(cols, rows, desiredSize) {
+            const containerWidth = window.innerWidth - 160;
+            const containerHeight = window.innerHeight - 150;
+            const gap = 12;
+
+            const maxTileW = Math.floor((containerWidth - (cols - 1) * gap) / cols);
+            const maxTileH = Math.floor((containerHeight - (rows - 1) * gap) / rows / 0.75);
+
+            let calculated = Math.min(desiredSize, maxTileW, maxTileH);
+            return Math.max(calculated, 60);
+        }
+
+        function render() {
+            if (data.settings.bg && (data.settings.bg.startsWith('http') || data.settings.bg.startsWith('data:image'))) {
+                document.body.style.backgroundImage = `url('${data.settings.bg}')`;
+                document.body.style.backgroundColor = '#222';
+            } else {
+                document.body.style.backgroundImage = 'none';
+                document.body.style.backgroundColor = data.settings.bg || '#33373b';
+            }
+
+            document.getElementById('searchEngine').value = data.settings.engine;
+
+            const slider = document.getElementById('workspacesSlider');
+            slider.innerHTML = '';
+            const cols = parseInt(data.settings.cols) || 8;
+            const rows = parseInt(data.settings.rows) || 4;
+            const desiredSize = parseInt(data.settings.tileSize) || 130;
+            const actualTileSize = calculateAdaptiveTileSize(cols, rows, desiredSize);
+            const totalSlots = cols * rows;
+
+            data.tabs.forEach((tab) => {
+                const page = document.createElement('div');
+                page.className = 'workspace-page';
+                
+                if (tab.id !== currentTabId) {
+                    page.style.visibility = 'hidden';
+                } else {
+                    page.style.visibility = 'visible';
+                }
+
+                const grid = document.createElement('div');
+                grid.className = 'tiles-grid';
+                grid.style.gridTemplateColumns = `repeat(${cols}, ${actualTileSize}px)`;
+
+                if (!data.tiles[tab.id]) data.tiles[tab.id] = {};
+                const tabTiles = data.tiles[tab.id];
+
+                for (let i = 0; i < totalSlots; i++) {
+                    if (tabTiles[i]) {
+                        const tile = tabTiles[i];
+                        const el = document.createElement('div');
+                        el.className = 'tile';
+                        el.draggable = true;
+                        el.style.height = `${Math.round(actualTileSize * 0.75)}px`;
+                        el.innerHTML = `
+                            <div class="tile-actions">
+                                <button class="tile-action-btn" onclick="openTileModal(event, '${tab.id}', ${i}, 'basic')" title="Настройки" aria-label="Настройки"><svg aria-hidden="true"><use href="#gear-icon"></use></svg></button>
+                                <button class="tile-action-btn" onclick="openTileModal(event, '${tab.id}', ${i}, 'delete')" title="Удалить" aria-label="Удалить"><svg aria-hidden="true"><use href="#close-icon"></use></svg></button>
+                            </div>
+                            <img class="tile-bg" src="${tile.img}" onerror="this.src='https://www.google.com/s2/favicons?sz=128&domain=${tile.url}'" />
+                        `;
+
+                        el.onclick = (e) => {
+                            if (e.target.closest('.tile-actions')) return;
+                            if (data.settings.openInNewTab) {
+                                window.open(tile.url, '_blank');
+                            } else {
+                                window.location.href = tile.url;
+                            }
+                        };
+
+                        el.addEventListener('dragstart', (e) => {
+                            draggedFromIndex = i;
+                            draggedFromTabId = tab.id;
+                            e.dataTransfer.setData('text/plain', JSON.stringify({ tabId: tab.id, index: i }));
+                            setTimeout(() => el.classList.add('dragging'), 0);
+                        });
+                        el.addEventListener('dragend', () => {
+                            el.classList.remove('dragging');
+                            draggedFromIndex = null;
+                            draggedFromTabId = null;
+                            document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('drag-over-tab'));
+                        });
+                        el.addEventListener('dragover', (e) => { e.preventDefault(); });
+                        el.addEventListener('drop', (e) => {
+                            e.preventDefault();
+                            if (draggedFromIndex === null || !draggedFromTabId) return;
+                            
+                            const sourceTiles = data.tiles[draggedFromTabId];
+                            const movingTile = sourceTiles[draggedFromIndex];
+                            if (!movingTile) return;
+
+                            if (draggedFromTabId === tab.id) {
+                                if (draggedFromIndex === i) return;
+                                const temp = tabTiles[i];
+                                tabTiles[i] = movingTile;
+                                if (temp) {
+                                    tabTiles[draggedFromIndex] = temp;
+                                } else {
+                                    delete tabTiles[draggedFromIndex];
+                                }
+                            } else {
+                                const targetTemp = tabTiles[i];
+                                tabTiles[i] = movingTile;
+                                delete sourceTiles[draggedFromIndex];
+                                if (targetTemp) {
+                                    sourceTiles[draggedFromIndex] = targetTemp;
+                                }
+                            }
+                            saveData();
+                        });
+
+                        grid.appendChild(el);
+                    } else {
+                        const slot = document.createElement('div');
+                        slot.className = 'empty-slot';
+                        slot.style.height = `${Math.round(actualTileSize * 0.75)}px`;
+                        slot.innerHTML = `<span class="plus-icon">+</span>`;
+                        slot.onclick = () => openAddTileModal(tab.id, i);
+
+                        slot.addEventListener('dragover', (e) => { 
+                            e.preventDefault(); 
+                            slot.classList.add('drag-over');
+                        });
+                        slot.addEventListener('dragleave', () => {
+                            slot.classList.remove('drag-over');
+                        });
+                        slot.addEventListener('drop', (e) => {
+                            e.preventDefault();
+                            slot.classList.remove('drag-over');
+                            if (draggedFromIndex === null || !draggedFromTabId) return;
+
+                            const sourceTiles = data.tiles[draggedFromTabId];
+                            const movingTile = sourceTiles[draggedFromIndex];
+                            if (!movingTile) return;
+
+                            tabTiles[i] = movingTile;
+                            delete sourceTiles[draggedFromIndex];
+                            saveData();
+                        });
+
+                        grid.appendChild(slot);
+                    }
+                }
+
+                page.appendChild(grid);
+                slider.appendChild(page);
+            });
+
+            updateSliderPosition(false);
+
+            const tabsContainer = document.getElementById('tabsBar');
+            tabsContainer.innerHTML = '';
+            
+            data.tabs.forEach((tab) => {
+                const item = document.createElement('button');
+                item.className = `tab-item ${tab.id === currentTabId ? 'active' : ''}`;
+                item.innerText = tab.name;
+                item.onclick = () => switchWorkspace(tab.id);
+                
+                item.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    item.classList.add('drag-over-tab');
+                    if (currentTabId !== tab.id) {
+                        switchWorkspace(tab.id);
+                    }
+                });
+                item.addEventListener('dragleave', () => {
+                    item.classList.remove('drag-over-tab');
+                });
+                item.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    item.classList.remove('drag-over-tab');
+                });
+
+                item.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    activeCtxTabId = tab.id;
+                    document.getElementById('ctxTabNameText').innerText = tab.name;
+                    const menu = document.getElementById('tabContextMenu');
+                    menu.style.display = 'block';
+                    
+                    const menuWidth = 220;
+                    const menuHeight = 110;
+                    let left = Math.min(e.clientX, window.innerWidth - menuWidth - 10);
+                    let top = window.innerHeight - 36 - menuHeight - 8;
+                    
+                    menu.style.left = left + 'px';
+                    menu.style.top = top + 'px';
+                };
+
+                tabsContainer.appendChild(item);
+            });
+
+            const addTabBtn = document.createElement('button');
+            addTabBtn.className = 'tab-item add-tab-item';
+            addTabBtn.innerText = '+ Рабочий стол';
+            addTabBtn.onclick = addTab;
+            tabsContainer.appendChild(addTabBtn);
+        }
+
+        window.onresize = () => render();
+
+        function switchWorkspace(tabId) {
+            currentTabId = tabId;
+            updateSliderPosition(true);
+            render();
+        }
+
+        function updateSliderPosition(animate = true) {
+            const slider = document.getElementById('workspacesSlider');
+            const index = data.tabs.findIndex(t => t.id === currentTabId);
+            if (index !== -1) {
+                slider.style.transition = animate ? 'transform 0.35s cubic-bezier(0.25, 1, 0.5, 1)' : 'none';
+                slider.style.transform = `translateX(-${index * 100}%)`;
+                
+                document.getElementById('leftArrow').style.display = index > 0 ? 'flex' : 'none';
+                document.getElementById('rightArrow').style.display = index < data.tabs.length - 1 ? 'flex' : 'none';
+            }
+        }
+
+        function slideWorkspace(direction) {
+            const index = data.tabs.findIndex(t => t.id === currentTabId);
+            const newIndex = index + direction;
+            if (newIndex >= 0 && newIndex < data.tabs.length) {
+                switchWorkspace(data.tabs[newIndex].id);
+            }
+        }
+
+        window.onclick = () => {
+            document.getElementById('tabContextMenu').style.display = 'none';
+        };
+
+        function ctxRenameTab() {
+            const tab = data.tabs.find(t => t.id === activeCtxTabId);
+            if (!tab) return;
+            const newName = prompt('Новое название рабочего стола:', tab.name);
+            if (newName && newName.trim()) {
+                tab.name = newName.trim();
+                saveData();
+            }
+        }
+
+        function ctxDeleteTab() {
+            if (data.tabs.length <= 1) {
+                alert('Нельзя удалить единственный рабочий стол!');
+                return;
+            }
+            if (confirm('Удалить этот рабочий стол и все его закладки?')) {
+                data.tabs = data.tabs.filter(t => t.id !== activeCtxTabId);
+                delete data.tiles[activeCtxTabId];
+                if (currentTabId === activeCtxTabId) {
+                    currentTabId = data.tabs[0].id;
+                }
+                saveData();
+            }
+        }
+
+        let activeTabForTile = null;
+        function openAddTileModal(tabId, slotIndex) {
+            activeTabForTile = tabId;
+            targetSlotIndex = slotIndex;
+            document.getElementById('newTileUrl').value = '';
+            document.getElementById('newTileTitle').value = '';
+            document.getElementById('addTileModal').style.display = 'flex';
+            document.getElementById('newTileUrl').focus();
+        }
+        function closeAddTileModal() {
+            document.getElementById('addTileModal').style.display = 'none';
+            targetSlotIndex = null;
+        }
+        function confirmAddTile() {
+            let url = document.getElementById('newTileUrl').value.trim();
+            let title = document.getElementById('newTileTitle').value.trim();
+            if (!url) {
+                alert('Пожалуйста, введите адрес сайта!');
+                return;
+            }
+            if (!url.startsWith('http')) url = 'https://' + url;
+            try {
+                const domain = new URL(url).hostname;
+                if (!title) title = domain;
+                const img = `https://www.google.com/s2/favicons?sz=128&domain=${domain}`;
+                if (!data.tiles[activeTabForTile]) data.tiles[activeTabForTile] = {};
+                data.tiles[activeTabForTile][targetSlotIndex] = { title, url, img };
+                saveData();
+                closeAddTileModal();
+            } catch (err) {
+                alert('Некорректный адрес URL!');
+            }
+        }
+
+        function addTab() {
+            const name = prompt('Название нового рабочего стола:');
+            if (name && name.trim()) { 
+                const id = 'tab_' + Date.now(); 
+                data.tabs.push({ id, name: name.trim() }); 
+                data.tiles[id] = {}; 
+                currentTabId = id; 
+                saveData(); 
+            }
+        }
+
+        function switchSettingsTab(tabName) {
+            document.querySelectorAll('#settingsModal .modal-menu-item').forEach(el => el.classList.remove('active'));
+            document.getElementById('secGeneral').style.display = 'none';
+            document.getElementById('secColor').style.display = 'none';
+            document.getElementById('secBg').style.display = 'none';
+            document.getElementById('secSync').style.display = 'none';
+
+            if (tabName === 'general') {
+                document.getElementById('menuGeneral').classList.add('active');
+                document.getElementById('secGeneral').style.display = 'block';
+            } else if (tabName === 'color') {
+                document.getElementById('menuColor').classList.add('active');
+                document.getElementById('secColor').style.display = 'block';
+            } else if (tabName === 'bg') {
+                document.getElementById('menuBg').classList.add('active');
+                document.getElementById('secBg').style.display = 'block';
+            } else if (tabName === 'sync') {
+                document.getElementById('menuSync').classList.add('active');
+                document.getElementById('secSync').style.display = 'block';
+            }
+        }
+
+        function openSettingsModal() {
+            document.getElementById('colsInputModal').value = data.settings.cols;
+            document.getElementById('rowsInputModal').value = data.settings.rows;
+            document.getElementById('sizeInputModal').value = data.settings.tileSize;
+            document.getElementById('openInNewTabModal').checked = !!data.settings.openInNewTab;
+            document.getElementById('bgColorInput').value = data.settings.bg.startsWith('#') ? data.settings.bg : '#33373b';
+            switchSettingsTab('general');
+            document.getElementById('settingsModal').style.display = 'flex';
+        }
+
+        function closeSettingsModal() { document.getElementById('settingsModal').style.display = 'none'; }
+        function saveGlobalSettings() {
+            data.settings.cols = parseInt(document.getElementById('colsInputModal').value) || 8;
+            data.settings.rows = parseInt(document.getElementById('rowsInputModal').value) || 4;
+            data.settings.tileSize = parseInt(document.getElementById('sizeInputModal').value) || 130;
+            data.settings.openInNewTab = document.getElementById('openInNewTabModal').checked;
+            saveData();
+            closeSettingsModal();
+        }
+
+        function setBgColor(color) { data.settings.bg = color; saveData(); }
+        function setBgImage(url) { data.settings.bg = url; saveData(); }
+        function handleBgUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (evt) => { data.settings.bg = evt.target.result; saveData(); };
+            reader.readAsDataURL(file);
+        }
+
+        function openTileModal(e, tabId, index, initialTab = 'basic') {
+            e.preventDefault();
+            e.stopPropagation();
+            currentTabId = tabId;
+            editingTileIndex = index;
+            const tile = data.tiles[tabId][index];
+            
+            document.getElementById('tileUrlInput').value = tile.url;
+            document.getElementById('tileTitleInput').value = tile.title;
+            
+            cropState.scale = 1; cropState.x = 0; cropState.y = 0;
+            document.getElementById('scaleRange').value = 1;
+
+            cropState.imgObj.src = tile.img;
+            cropState.imgObj.onload = () => { updateCropView(); };
+            
+            switchTabModal(initialTab);
+            document.getElementById('tileModal').style.display = 'flex';
+        }
+
+        function updateCropView() {
+            const imgEl = document.getElementById('cropImage');
+            imgEl.src = cropState.imgObj.src;
+            const wrapW = 360, wrapH = 220;
+            const baseW = wrapW * cropState.scale;
+            const baseH = (cropState.imgObj.height / cropState.imgObj.width) * baseW;
+            
+            imgEl.style.width = baseW + 'px';
+            imgEl.style.height = baseH + 'px';
+            imgEl.style.transform = `translate(${cropState.x}px, ${cropState.y}px)`;
+        }
+
+        const wrap = document.getElementById('cropWrap');
+        wrap.onmousedown = (e) => {
+            cropState.isDragging = true;
+            cropState.startX = e.clientX - cropState.x;
+            cropState.startY = e.clientY - cropState.y;
+        };
+        window.onmousemove = (e) => {
+            if (!cropState.isDragging) return;
+            cropState.x = e.clientX - cropState.startX;
+            cropState.y = e.clientY - cropState.startY;
+            updateCropView();
+        };
+        window.onmouseup = () => { cropState.isDragging = false; };
+
+        document.getElementById('scaleRange').oninput = (e) => {
+            cropState.scale = parseFloat(e.target.value);
+            updateCropView();
+        };
+
+        function switchTabModal(tabName) {
+            document.querySelectorAll('#tileModal .modal-menu-item').forEach(el => el.classList.remove('active'));
+            document.getElementById('sectionBasic').style.display = 'none';
+            document.getElementById('sectionThumb').style.display = 'none';
+            document.getElementById('sectionDelete').style.display = 'none';
+
+            if (tabName === 'basic') {
+                document.getElementById('menuBasic').classList.add('active');
+                document.getElementById('sectionBasic').style.display = 'block';
+            } else if (tabName === 'thumb') {
+                document.getElementById('menuThumb').classList.add('active');
+                document.getElementById('sectionThumb').style.display = 'block';
+                setTimeout(updateCropView, 50);
+            } else if (tabName === 'delete') {
+                document.getElementById('menuDelete').classList.add('active');
+                document.getElementById('sectionDelete').style.display = 'block';
+            }
+        }
+
+        function closeTileModal() {
+            document.getElementById('tileModal').style.display = 'none';
+            editingTileIndex = null;
+        }
+
+        function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                cropState.imgObj.src = evt.target.result;
+                cropState.imgObj.onload = () => {
+                    cropState.scale = 1; cropState.x = 0; cropState.y = 0;
+                    document.getElementById('scaleRange').value = 1;
+                    updateCropView();
+                };
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function saveTileChanges() {
+            if (editingTileIndex === null) return;
+            const tile = data.tiles[currentTabId][editingTileIndex];
+            tile.url = document.getElementById('tileUrlInput').value;
+            tile.title = document.getElementById('tileTitleInput').value;
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = 360; canvas.height = 220;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#222';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const wrapW = 360, wrapH = 220;
+            const baseW = wrapW * cropState.scale;
+            const baseH = (cropState.imgObj.height / cropState.imgObj.width) * baseW;
+            
+            ctx.drawImage(cropState.imgObj, cropState.x, cropState.y, baseW, baseH);
+            tile.img = canvas.toDataURL('image/jpeg', 0.9);
+            
+            saveData();
+            closeTileModal();
+        }
+
+        function deleteCurrentTile() {
+            if (editingTileIndex === null) return;
+            delete data.tiles[currentTabId][editingTileIndex];
+            saveData();
+            closeTileModal();
+        }
+
+        function doSearch() {
+            const query = document.getElementById('searchInput').value;
+            const engine = document.getElementById('searchEngine').value;
+            if (query) {
+                if (data.settings.openInNewTab) {
+                    window.open(engine + encodeURIComponent(query), '_blank');
+                } else {
+                    window.location.href = engine + encodeURIComponent(query);
+                }
+            }
+        }
+
+        function toggleVoiceSearch() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                alert('Ваш браузер не поддерживает голосовой поиск.');
+                return;
+            }
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'ru-RU';
+            const micBtn = document.getElementById('micBtn');
+
+            recognition.onstart = () => {
+                micBtn.classList.add('listening');
+            };
+
+            recognition.onresult = (event) => {
+                const speechResult = event.results[0][0].transcript;
+                document.getElementById('searchInput').value = speechResult;
+                doSearch();
+            };
+
+            recognition.onerror = () => {
+                micBtn.classList.remove('listening');
+            };
+
+            recognition.onend = () => {
+                micBtn.classList.remove('listening');
+            };
+
+            recognition.start();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            render();
+            document.getElementById('searchEngine').onchange = (e) => { data.settings.engine = e.target.value; saveData(); };
+            document.getElementById('searchInput').onkeypress = (e) => { if (e.key === 'Enter') doSearch(); };
+        });
+
+        function exportData() {
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'startpage_backup.json'; a.click();
+        }
+
+        function importData(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                try { data = JSON.parse(evt.target.result); currentTabId = data.tabs[0].id; saveData(); alert('Бэкап загружен!'); } 
+                catch (err) { alert('Ошибка бэкапа!'); }
+            };
+            reader.readAsText(file);
+        }
+    </script>
+</body>
+</html>
