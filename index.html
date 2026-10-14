@@ -105,6 +105,20 @@
         .crop-preview-wrap:active { cursor: grabbing; }
         #cropImage { position: absolute; top: 0; left: 0; user-select: none; pointer-events: none; }
     </style>
+
+    <!-- Добавлены только стили окна входа; существующее оформление не меняется. -->
+    <style>
+      .cloud-shade { position:fixed; inset:0; z-index:4500; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.65); }
+      .cloud-dialog { width:min(440px,calc(100vw - 32px)); padding:28px; border-radius:12px; background:#fff; color:#222; box-shadow:0 14px 40px rgba(0,0,0,.55); font-size:14px; }
+      .cloud-dialog h3 { font-size:20px; margin:0 0 10px; }
+      .cloud-dialog p { margin:10px 0; line-height:1.5; color:#555; }
+      .cloud-dialog input { display:block; width:100%; border:1px solid #bbb; padding:12px; border-radius:6px; margin:10px 0; font:inherit; }
+      .cloud-actions { display:flex; align-items:center; gap:10px; margin-top:16px; }
+      .cloud-actions button { border:0; border-radius:6px; cursor:pointer; padding:11px 14px; font:inherit; }
+      .cloud-primary { background:#fc3f1d; color:white; }
+      .cloud-secondary { background:#eee; color:#222; }
+      #cloudStatusMessage { font-size:13px; white-space:pre-line; overflow-wrap:anywhere; }
+    </style>
 </head>
 <body>
     <!-- Один и тот же контур шестерёнки для закладок и главной кнопки. -->
@@ -165,6 +179,7 @@
                 <div id="menuColor" class="modal-menu-item" onclick="switchSettingsTab('color')">Базовое оформление</div>
                 <div id="menuBg" class="modal-menu-item" onclick="switchSettingsTab('bg')">Индивидуальный фон</div>
                 <div id="menuSync" class="modal-menu-item" onclick="switchSettingsTab('sync')">Синхронизация и бэкап</div>
+                <div class="modal-menu-item" onclick="openCloudDialog()">☁ Облачная синхронизация</div>
                 <div class="modal-menu-item" onclick="closeSettingsModal()" style="margin-top: auto; border-top: 1px solid #ddd; color: #666;">Вернуться</div>
             </div>
             <div class="modal-body">
@@ -307,6 +322,26 @@
         </div>
     </div>
 
+
+    <!-- Вход в Supabase: пароль остаётся в браузере и никогда не сохраняется в GitHub. -->
+    <div id="cloudAuthOverlay" class="cloud-shade" role="dialog" aria-modal="true" aria-labelledby="cloudDialogTitle">
+      <div class="cloud-dialog">
+        <h3 id="cloudDialogTitle">Облачная синхронизация</h3>
+        <p id="cloudLoginText">Войдите с тем же email и паролем Supabase, чтобы открыть свои плитки и настройки в любом браузере.</p>
+        <div id="cloudLoginFields">
+          <input type="email" id="cloudEmail" placeholder="Электронная почта" autocomplete="username" aria-label="Электронная почта">
+          <input type="password" id="cloudPassword" placeholder="Пароль" autocomplete="current-password" aria-label="Пароль">
+        </div>
+        <p id="cloudStatusMessage" aria-live="polite"></p>
+        <div class="cloud-actions">
+          <button type="button" class="cloud-primary" id="cloudLoginButton" onclick="cloudSignIn()">Войти</button>
+          <button type="button" class="cloud-secondary" onclick="closeCloudDialog()">Закрыть</button>
+          <button type="button" class="cloud-secondary" id="cloudLogoutButton" onclick="cloudSignOut()" style="display:none">Выйти из аккаунта</button>
+        </div>
+      </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
     <script>
         const defaultData = {
             settings: { cols: 8, rows: 4, tileSize: 130, engine: 'https://yandex.ru/search/?text=', bg: '#33373b', openInNewTab: false },
@@ -352,7 +387,12 @@
         let activeCtxTabId = null;
         let cropState = { imgObj: new Image(), x: 0, y: 0, scale: 1, isDragging: false, startX: 0, startY: 0 };
 
-        function saveData() { localStorage.setItem('my_startpage_data', JSON.stringify(data)); render(); }
+        function saveData() {
+            try { localStorage.setItem('my_startpage_data', JSON.stringify(data)); }
+            catch (e) { console.warn('Локальная копия не сохранилась; используйте облачный бэкап.', e); }
+            render();
+            if (cloud.ready) cloudScheduleSave();
+        }
 
         function calculateAdaptiveTileSize(cols, rows, desiredSize) {
             const containerWidth = window.innerWidth - 160;
@@ -367,7 +407,10 @@
         }
 
         function render() {
-            if (data.settings.bg && (data.settings.bg.startsWith('http') || data.settings.bg.startsWith('data:image'))) {
+            if (data.settings.bg && data.settings.bg.startsWith('cloud:')) {
+                document.body.style.backgroundImage = 'none';
+                document.body.style.backgroundColor = '#222';
+            } else if (data.settings.bg && (data.settings.bg.startsWith('http') || data.settings.bg.startsWith('data:image'))) {
                 document.body.style.backgroundImage = `url('${data.settings.bg}')`;
                 document.body.style.backgroundColor = '#222';
             } else {
@@ -414,7 +457,7 @@
                                 <button class="tile-action-btn" onclick="openTileModal(event, '${tab.id}', ${i}, 'basic')" title="Настройки" aria-label="Настройки"><svg aria-hidden="true"><use href="#gear-icon"></use></svg></button>
                                 <button class="tile-action-btn" onclick="openTileModal(event, '${tab.id}', ${i}, 'delete')" title="Удалить" aria-label="Удалить"><svg aria-hidden="true"><use href="#close-icon"></use></svg></button>
                             </div>
-                            <img class="tile-bg" src="${tile.img}" onerror="this.src='https://www.google.com/s2/favicons?sz=128&domain=${tile.url}'" />
+                            <img class="tile-bg" src="${tile.img && tile.img.startsWith('cloud:') ? 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=' : tile.img}" data-cloud-image="${tile.img && tile.img.startsWith('cloud:') ? tile.img.slice(6) : ''}" onerror="this.onerror=null;this.src='https://www.google.com/s2/favicons?sz=128&domain=${tile.url}'" />
                         `;
 
                         el.onclick = (e) => {
@@ -504,6 +547,7 @@
                 slider.appendChild(page);
             });
 
+            cloudRefreshImages();
             updateSliderPosition(false);
 
             const tabsContainer = document.getElementById('tabsBar');
@@ -723,8 +767,16 @@
             cropState.scale = 1; cropState.x = 0; cropState.y = 0;
             document.getElementById('scaleRange').value = 1;
 
-            cropState.imgObj.src = tile.img;
             cropState.imgObj.onload = () => { updateCropView(); };
+            if (tile.img && tile.img.startsWith('cloud:')) {
+                cropState.imgObj.crossOrigin = 'anonymous';
+                cloudSignedUrl(tile.img.slice(6)).then(url => {
+                    if (url && editingTileIndex === index) cropState.imgObj.src = url;
+                }).catch(console.error);
+            } else {
+                cropState.imgObj.removeAttribute('crossorigin');
+                cropState.imgObj.src = tile.img;
+            }
             
             switchTabModal(initialTab);
             document.getElementById('tileModal').style.display = 'flex';
@@ -877,6 +929,7 @@
             render();
             document.getElementById('searchEngine').onchange = (e) => { data.settings.engine = e.target.value; saveData(); };
             document.getElementById('searchInput').onkeypress = (e) => { if (e.key === 'Enter') doSearch(); };
+            initCloud();
         });
 
         function exportData() {
@@ -894,6 +947,241 @@
             };
             reader.readAsText(file);
         }
+
+        // === Дополнительная облачная синхронизация (Supabase) ===
+        // Подключение к личному проекту Supabase через публичный Publishable key.
+        // Никогда не вставляйте service_role / secret key в HTML!
+        const SUPABASE_PROJECT_URL = 'https://vxmmrjgrwxixjhiedsqp.supabase.co';
+        const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_AE5EQJ1qL74rNsEOKM928A_e2p0gxtW';
+        const CLOUD_ASSETS_BUCKET = 'startpage-assets'; // private bucket
+        const cloud = {
+            client: null, user: null, ready: false, saving: false,
+            pending: false, saveTimer: null, pollTimer: null, revision: 0,
+            lastUpdatedAt: null, signed: new Map()
+        };
+        const cloudConfigured = () =>
+            SUPABASE_PROJECT_URL.startsWith('https://') &&
+            SUPABASE_PROJECT_URL.endsWith('.supabase.co') &&
+            SUPABASE_PUBLISHABLE_KEY !== 'PASTE_PUBLISHABLE_KEY_HERE' &&
+            SUPABASE_PUBLISHABLE_KEY.length > 20;
+
+        function cloudMessage(message) {
+            const node = document.getElementById('cloudStatusMessage');
+            if (node) node.textContent = message;
+        }
+        function openCloudDialog() {
+            document.getElementById('cloudAuthOverlay').style.display = 'flex';
+            document.getElementById('cloudLoginFields').style.display = cloud.user ? 'none' : 'block';
+            document.getElementById('cloudLoginButton').style.display = cloud.user ? 'none' : 'inline-block';
+            document.getElementById('cloudLogoutButton').style.display = cloud.user ? 'inline-block' : 'none';
+            if (!cloudConfigured()) cloudMessage('Нужно сначала вписать URL проекта и Publishable key в HTML. Не используйте secret/service_role key.');
+            else if (cloud.user) cloudMessage(cloud.ready ? '✓ Выполнен вход. Проверьте, загружены ли ваши плитки; при необходимости импортируйте бэкап.' : 'Проверяем облако…');
+            else cloudMessage('Войдите под личным пользователем, созданным в Supabase → Authentication → Users.');
+        }
+        function closeCloudDialog() { document.getElementById('cloudAuthOverlay').style.display = 'none'; }
+
+        async function initCloud() {
+            if (!cloudConfigured()) { openCloudDialog(); return; }
+            if (!window.supabase || typeof window.supabase.createClient !== 'function') {
+                openCloudDialog(); cloudMessage('Не загрузилась библиотека Supabase. Проверьте интернет и обновите страницу.'); return;
+            }
+            cloud.client = window.supabase.createClient(SUPABASE_PROJECT_URL, SUPABASE_PUBLISHABLE_KEY);
+            const { data: result, error } = await cloud.client.auth.getSession();
+            if (error) { openCloudDialog(); cloudMessage('Ошибка проверки входа: ' + error.message); return; }
+            if (!result.session?.user) { openCloudDialog(); return; }
+            cloud.user = result.session.user;
+            await cloudLoadInitial();
+        }
+
+        async function cloudSignIn() {
+            if (!cloud.client) { cloudMessage('Сначала укажите URL проекта и Publishable key в HTML.'); return; }
+            const email = document.getElementById('cloudEmail').value.trim();
+            const password = document.getElementById('cloudPassword').value;
+            if (!email || !password) { cloudMessage('Введите email и пароль.'); return; }
+            cloudMessage('Вход…');
+            const { data: signIn, error } = await cloud.client.auth.signInWithPassword({ email, password });
+            document.getElementById('cloudPassword').value = '';
+            if (error) { cloudMessage('Ошибка входа: ' + error.message + '\nПроверьте, подтверждён ли пользователь в Supabase.'); return; }
+            cloud.user = signIn.user;
+            await cloudLoadInitial();
+        }
+
+        async function cloudSignOut() {
+            if (!cloud.client) return;
+            clearInterval(cloud.pollTimer); clearTimeout(cloud.saveTimer);
+            await cloud.client.auth.signOut();
+            cloud.ready = false; cloud.user = null; cloud.lastUpdatedAt = null; cloud.signed.clear();
+            localStorage.removeItem('my_startpage_data');
+            data = JSON.parse(JSON.stringify(defaultData));
+            currentTabId = data.tabs[0].id;
+            render();
+            closeCloudDialog(); openCloudDialog();
+        }
+
+        async function cloudLoadInitial() {
+            cloudMessage('Загрузка данных из облака…');
+            const { data: remote, error } = await cloud.client.from('startpage_data')
+                .select('data, updated_at').eq('user_id', cloud.user.id).maybeSingle();
+            if (error) { openCloudDialog(); cloudMessage('Ошибка чтения таблицы startpage_data: ' + error.message); return; }
+            let emptyCloud = false;
+            if (remote && remote.data && remote.data.tabs && remote.data.settings) {
+                // Облако — основной источник. До первого замещения сохраняем
+                // независимую резервную копию прежних локальных закладок.
+                try {
+                    const previous = localStorage.getItem('my_startpage_data');
+                    if (previous && previous !== JSON.stringify(remote.data) &&
+                        !localStorage.getItem('my_startpage_before_cloud_backup')) {
+                        localStorage.setItem('my_startpage_before_cloud_backup', previous);
+                    }
+                } catch (e) { console.warn(e); }
+                data = remote.data;
+                cloud.lastUpdatedAt = remote.updated_at;
+                currentTabId = data.tabs[0]?.id || 'main';
+                try { localStorage.setItem('my_startpage_data', JSON.stringify(data)); } catch (e) { console.warn(e); }
+                render();
+            } else {
+                // Не заполняем новый облачный аккаунт шаблонными плитками
+                // на новом устройстве до импорта настоящего бэкапа.
+                cloud.lastUpdatedAt = null;
+                emptyCloud = true;
+                cloud.ready = true;
+                if (localStorage.getItem('my_startpage_data')) {
+                    cloud.revision++;
+                    await cloudSave();
+                    if (!cloud.lastUpdatedAt) {
+                        openCloudDialog();
+                        return;
+                    }
+                    emptyCloud = false;
+                }
+            }
+            cloud.ready = true;
+            cloudMessage(emptyCloud
+                ? 'Облако пока пустое. Если у вас есть старые плитки, откройте настройки → «Синхронизация и бэкап» и импортируйте JSON-бэкап из прежней панели. После импорта всё сохранится в облаке.'
+                : '✓ Подключено. Изменения синхронизируются между браузерами.');
+            if (!emptyCloud) closeCloudDialog();
+            clearInterval(cloud.pollTimer);
+            cloud.pollTimer = setInterval(cloudPoll, 15000);
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) cloudPoll();
+            }, { passive:true });
+            cloudRefreshImages();
+        }
+
+        function cloudScheduleSave(delay=650) {
+            if (!cloud.ready || !cloud.user) return;
+            cloud.revision++;
+            cloud.pending = true;
+            clearTimeout(cloud.saveTimer);
+            cloud.saveTimer = setTimeout(() => {
+                cloud.saveTimer = null;
+                cloudSave();
+            }, delay);
+        }
+
+        function cloudMimeExt(type) {
+            return ({'image/jpeg':'jpg', 'image/png':'png', 'image/webp':'webp',
+                'image/gif':'gif', 'image/svg+xml':'svg', 'image/avif':'avif'})[type] || 'bin';
+        }
+        async function cloudUploadDataUri(uri) {
+            const blob = await (await fetch(uri)).blob();
+            if (!blob.type.startsWith('image/')) throw new Error('Разрешены только изображения.');
+            const path = cloud.user.id + '/' + crypto.randomUUID() + '.' + cloudMimeExt(blob.type);
+            const { error } = await cloud.client.storage.from(CLOUD_ASSETS_BUCKET)
+                .upload(path, blob, { contentType:blob.type, upsert:false });
+            if (error) throw error;
+            return 'cloud:' + path;
+        }
+
+        async function cloudPrepareSnapshot(snapshot) {
+            const uploaded = new Map();
+            const convert = async (value) => {
+                if (typeof value !== 'string' || !value.startsWith('data:image/')) return value;
+                if (!uploaded.has(value)) uploaded.set(value, await cloudUploadDataUri(value));
+                return uploaded.get(value);
+            };
+            snapshot.settings.bg = await convert(snapshot.settings.bg);
+            for (const tiles of Object.values(snapshot.tiles || {})) {
+                for (const tile of Object.values(tiles || {})) {
+                    if (tile && tile.img) tile.img = await convert(tile.img);
+                }
+            }
+            return snapshot;
+        }
+
+        async function cloudSave() {
+            if (!cloud.ready || !cloud.user) return;
+            if (cloud.saving) { cloud.pending = true; return; }
+            cloud.saving = true;
+            cloud.pending = false;
+            const currentRev = cloud.revision;
+            const snapshot = JSON.parse(JSON.stringify(data));
+            try {
+                await cloudPrepareSnapshot(snapshot);
+                const { data: rows, error } = await cloud.client.from('startpage_data')
+                    .upsert({ user_id:cloud.user.id, data:snapshot, updated_at:new Date().toISOString() },
+                        { onConflict:'user_id' })
+                    .select('updated_at');
+                if (error) throw error;
+                cloud.lastUpdatedAt = rows?.[0]?.updated_at || cloud.lastUpdatedAt;
+                if (cloud.revision === currentRev) {
+                    data = snapshot;
+                    try { localStorage.setItem('my_startpage_data', JSON.stringify(data)); } catch (e) { console.warn(e); }
+                    render();
+                }
+                cloudMessage('✓ Сохранено в облако.');
+            } catch (e) {
+                cloudMessage('Не удалось сохранить в облако: ' + e.message + '\nПроверьте приватный bucket startpage-assets и его RLS.');
+                console.error('Cloud sync:', e);
+            } finally {
+                cloud.saving = false;
+                if (cloud.pending || cloud.revision !== currentRev) cloudScheduleSave(900);
+            }
+        }
+
+        async function cloudPoll() {
+            if (!cloud.ready || !cloud.user || cloud.saving || cloud.pending || cloud.saveTimer) return;
+            const revisionAtStart = cloud.revision;
+            const { data: remote, error } = await cloud.client.from('startpage_data')
+                .select('data, updated_at').eq('user_id', cloud.user.id).maybeSingle();
+            if (error) { console.warn('Cloud sync poll:', error); return; }
+            if (cloud.revision !== revisionAtStart || cloud.saving || cloud.pending) return;
+            if (!remote || remote.updated_at === cloud.lastUpdatedAt || !remote.data?.tabs) return;
+            data = remote.data;
+            cloud.lastUpdatedAt = remote.updated_at;
+            if (!data.tabs.some(tab => tab.id === currentTabId)) currentTabId = data.tabs[0]?.id || 'main';
+            try { localStorage.setItem('my_startpage_data', JSON.stringify(data)); } catch (e) { console.warn(e); }
+            render();
+        }
+
+        async function cloudSignedUrl(path) {
+            if (!cloud.client || !cloud.user || !path) return null;
+            const entry = cloud.signed.get(path);
+            if (entry && entry.expires > Date.now()) return entry.url;
+            const { data: signed, error } = await cloud.client.storage.from(CLOUD_ASSETS_BUCKET)
+                .createSignedUrl(path, 3600);
+            if (error) { console.warn('Cloud image:', error); return null; }
+            cloud.signed.set(path, { url:signed.signedUrl, expires:Date.now()+50*60*1000 });
+            return signed.signedUrl;
+        }
+        function cloudRefreshImages() {
+            if (!cloud.client || !cloud.user) return;
+            const bg = data?.settings?.bg;
+            if (bg && bg.startsWith('cloud:')) {
+                const target = bg.slice(6);
+                cloudSignedUrl(target).then(url => {
+                    if (url && data.settings.bg === bg) document.body.style.backgroundImage = `url("${url}")`;
+                });
+            }
+            document.querySelectorAll('img[data-cloud-image]').forEach(img => {
+                const path = img.dataset.cloudImage;
+                if (!path) return;
+                cloudSignedUrl(path).then(url => {
+                    if (url && img.isConnected && img.dataset.cloudImage === path) img.src = url;
+                });
+            });
+        }
+
     </script>
 </body>
 </html>
